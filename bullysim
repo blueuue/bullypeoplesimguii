@@ -1,0 +1,255 @@
+-----------------------------------------------------------------
+--  BULLY PEOPLE SIMULATOR – COMBINED GUI + IY ADMIN
+--  Punch Auto-Farm + Anti-Ragdoll + Infinite Yield Toggle
+--  Draggable • Three toggles • Respawn-safe
+-----------------------------------------------------------------
+repeat task.wait() until game:IsLoaded()
+local Players       = game:GetService("Players")
+local RunService    = game:GetService("RunService")
+local StarterGui    = game:GetService("StarterGui")
+local player        = Players.LocalPlayer
+-----------------------------------------------------------------
+--  VARIABLES
+-----------------------------------------------------------------
+local punchFarmEnabled   = false
+local antiRagdollEnabled = false
+local iyEnabled          = false
+local punchConn          = nil
+local ragdollConn        = nil
+local iyLoaded           = false
+-----------------------------------------------------------------
+--  PUNCH AUTO-FARM
+-----------------------------------------------------------------
+local function getPunchTool()
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return nil end
+    for _, tool in backpack:GetChildren() do
+        if tool:IsA("Tool") then
+            local n = tool.Name:lower()
+            if n:find("punch") or n:find("fist") or n:find("hit") then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+local function punchAndReset()
+    pcall(function()
+        local char = player.Character
+        if not char then return end
+        local hum  = char:FindFirstChildOfClass("Humanoid")
+        local hrp  = char:FindFirstChild("HumanoidRootPart")
+        if not (hum and hrp) then return end
+        local tool = getPunchTool()
+        if not tool then return end
+        hum:EquipTool(tool)
+        task.wait(0.05)
+        tool:Activate()
+        task.wait(0.05)
+        hum.Health = 0
+    end)
+end
+
+local function setPunchFarm(state)
+    punchFarmEnabled = state
+    if state then
+        StarterGui:SetCore("SendNotification", {Title = "PUNCH AUTO-FARM ON", Text = "Punching + resetting every frame", Duration = 3})
+        punchConn = RunService.Heartbeat:Connect(punchAndReset)
+    else
+        StarterGui:SetCore("SendNotification", {Title = "PUNCH AUTO-FARM OFF", Duration = 2})
+        if punchConn then punchConn:Disconnect() punchConn = nil end
+    end
+end
+
+-----------------------------------------------------------------
+--  ANTI-RAGDOLL
+-----------------------------------------------------------------
+local function antiRagdollLoop()
+    pcall(function()
+        local char = player.Character
+        if not char then return end
+        -- Remove VelocityDamage
+        local velDmg = char:FindFirstChild("VelocityDamage")
+        if velDmg then velDmg:Destroy() end
+        -- Force get-up
+        local rag = char:FindFirstChild("Ragdoll")
+        if rag and rag:IsA("BoolValue") and rag.Value then
+            local getUp = char:FindFirstChild("GetUpEvent")
+            if getUp and getUp:IsA("RemoteEvent") then
+                getUp:FireServer()
+            end
+        end
+        -- FakeAccessory bypass
+        for _, acc in char:GetChildren() do
+            if acc:IsA("Accessory") and acc.Name ~= "FakeAccessory" then
+                local handle = acc:FindFirstChild("Handle")
+                if handle and handle:FindFirstChildOfClass("Weld") then
+                    local clone = acc:Clone()
+                    acc:Destroy()
+                    clone.Name = "FakeAccessory"
+                    clone.Parent = char
+                end
+            end
+        end
+    end)
+end
+
+local function setAntiRagdoll(state)
+    antiRagdollEnabled = state
+    if state then
+        StarterGui:SetCore("SendNotification", {Title = "ANTI-RAGDOLL ON", Text = "Loop running…", Duration = 3})
+        ragdollConn = RunService.Heartbeat:Connect(antiRagdollLoop)
+    else
+        StarterGui:SetCore("SendNotification", {Title = "ANTI-RAGDOLL OFF", Duration = 2})
+        if ragdollConn then ragdollConn:Disconnect() ragdollConn = nil end
+    end
+end
+
+-----------------------------------------------------------------
+--  INFINITE YIELD ADMIN
+-----------------------------------------------------------------
+local function loadInfiniteYield()
+    if iyLoaded then return end
+    pcall(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+        iyLoaded = true
+        StarterGui:SetCore("SendNotification", {Title = "IY ADMIN LOADED", Text = "Use ;cmds in chat for help!", Duration = 5})
+    end)
+end
+
+local function setIY(state)
+    iyEnabled = state
+    if state and not iyLoaded then
+        loadInfiniteYield()
+    end
+end
+
+-----------------------------------------------------------------
+--  CREATE DRAGGABLE GUI
+-----------------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BullyCombinedGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 210, 0, 185)  -- Increased height for 3 buttons
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.fromRGB(255, 150, 0)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0.2, 0)
+title.BackgroundTransparency = 1
+title.Text = "BULLY SIM – made by blue-"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.SourceSansBold
+title.TextScaled = true
+title.Parent = frame
+
+-- Punch Farm Button
+local punchBtn = Instance.new("TextButton")
+punchBtn.Size = UDim2.new(0.9, 0, 0.18, 0)
+punchBtn.Position = UDim2.new(0.05, 0, 0.25, 0)
+punchBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+punchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+punchBtn.Font = Enum.Font.SourceSansSemibold
+punchBtn.TextScaled = true
+punchBtn.Text = "PUNCH FARM: OFF"
+punchBtn.Parent = frame
+punchBtn.MouseButton1Click:Connect(function()
+    setPunchFarm(not punchFarmEnabled)
+    punchBtn.Text = punchFarmEnabled and "PUNCH FARM: ON" or "PUNCH FARM: OFF"
+    punchBtn.BackgroundColor3 = punchFarmEnabled and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+end)
+
+-- Anti-Ragdoll Button
+local ragBtn = Instance.new("TextButton")
+ragBtn.Size = UDim2.new(0.9, 0, 0.18, 0)
+ragBtn.Position = UDim2.new(0.05, 0, 0.47, 0)
+ragBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ragBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ragBtn.Font = Enum.Font.SourceSansSemibold
+ragBtn.TextScaled = true
+ragBtn.Text = "ANTI-RAGDOLL: OFF"
+ragBtn.Parent = frame
+ragBtn.MouseButton1Click:Connect(function()
+    setAntiRagdoll(not antiRagdollEnabled)
+    ragBtn.Text = antiRagdollEnabled and "ANTI-RAGDOLL: ON" or "ANTI-RAGDOLL: OFF"
+    ragBtn.BackgroundColor3 = antiRagdollEnabled and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+end)
+
+-- IY Admin Button
+local iyBtn = Instance.new("TextButton")
+iyBtn.Size = UDim2.new(0.9, 0, 0.18, 0)
+iyBtn.Position = UDim2.new(0.05, 0, 0.69, 0)
+iyBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
+iyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+iyBtn.Font = Enum.Font.SourceSansSemibold
+iyBtn.TextScaled = true
+iyBtn.Text = "IY ADMIN: OFF"
+iyBtn.Parent = frame
+iyBtn.MouseButton1Click:Connect(function()
+    setIY(not iyEnabled)
+    iyBtn.Text = iyEnabled and "IY ADMIN: ON" or "IY ADMIN: OFF"
+    iyBtn.BackgroundColor3 = iyEnabled and Color3.fromRGB(150, 50, 255) or Color3.fromRGB(100, 50, 200)
+end)
+
+-----------------------------------------------------------------
+--  MANUAL DRAG FALLBACK
+-----------------------------------------------------------------
+local dragging = false
+local dragStart, startPos
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+frame.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-----------------------------------------------------------------
+--  RESPAWN HANDLING
+-----------------------------------------------------------------
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if punchFarmEnabled and punchConn then
+        punchConn:Disconnect()
+        punchConn = RunService.Heartbeat:Connect(punchAndReset)
+    end
+    if antiRagdollEnabled and ragdollConn then
+        ragdollConn:Disconnect()
+        ragdollConn = RunService.Heartbeat:Connect(antiRagdollLoop)
+    end
+    -- IY doesn't need to reload on respawn
+end)
+
+-----------------------------------------------------------------
+--  STARTUP NOTIFICATION
+-----------------------------------------------------------------
+StarterGui:SetCore("SendNotification", {
+    Title = "COMBINED GUI + IY LOADED!",
+    Text  = "Drag panel • Toggle features • Use ;cmds for IY",
+    Duration = 6
+})
+print("Bully People Simulator – Combined GUI + IY ready!")
